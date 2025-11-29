@@ -1,0 +1,104 @@
+<resources>
+    <string name="app_name">기도노트</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">홈</string>
+    <string name="nav_day_assignment">요일별</string>
+    <string name="nav_answered">응답 목록</string>
+    <string name="nav_statistics">통계</string>
+    <string name="nav_settings">설정</string>
+    
+    <!-- Common -->
+    <string name="add">추가</string>
+    <string name="edit">수정</string>
+    <string name="delete">삭제</string>
+    <string name="cancel">취소</string>
+    <string name="save">저장</string>
+    <string name="search">검색</string>
+    <string name="ok">확인</string>
+    
+    <!-- Person -->
+    <string name="person_name">이름</string>
+    <string name="person_memo">메모</string>
+    <string name="add_person">대상자 추가</string>
+    <string name="edit_person">대상자 수정</string>
+    <string name="person_list_empty">등록된 대상자가 없습니다</string>
+    
+    <!-- Prayer Topic -->
+    <string name="prayer_topic">기도제목</string>
+    <string name="add_prayer_topic">기도제목 추가</string>
+    <string name="edit_prayer_topic">기도제목 수정</string>
+    <string name="active_prayers">진행중</string>
+    <string name="answered_prayers">응답됨</string>
+    <string name="mark_as_answered">응답 완료</string>
+    <string name="prayer_topic_empty">기도제목이 없습니다</string>
+    
+    <!-- Day Assignment -->
+    <string name="day_assignment">요일별 할당</string>
+    <string name="monday">월요일</string>
+    <string name="tuesday">화요일</string>
+    <string name="wednesday">수요일</string>
+    <string name="thursday">목요일</string>
+    <string name="friday">금요일</string>
+    <string name="saturday">토요일</string>
+    <string name="sunday">일요일</string>
+    <string name="assign_person">대상자 할당</string>
+    <string name="no_assignment">할당된 대상자가 없습니다</string>
+    
+    <!-- Statistics -->
+    <string name="statistics_title">통계</string>
+    <string name="period_1_month">1개월</string>
+    <string name="period_3_months">3개월</string>
+    <string name="period_6_months">6개월</string>
+    <string name="period_1_year">1년</string>
+    <string name="total_prayers">총 기도 횟수</string>
+    <string name="answer_rate">응답률</string>
+    <string name="monthly_prayer_count">월별 기도 횟수</string>
+    <string name="monthly_answer_rate">월별 응답률</string>
+    <string name="prayer_by_person">대상자별 기도 비율</string>
+    <string name="no_statistics_data">통계 데이터가 없습니다</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">설정</string>
+    <string name="alarm_time">알림 시간</string>
+    <string name="add_alarm">알림 추가</string>
+    <string name="no_alarm">등록된 알림이 없습니다</string>
+    <string name="backup_restore">백업 및 복원</string>
+    <string name="backup_json">JSON 백업</string>
+    <string name="backup_csv">CSV 내보내기</string>
+    <string name="restore_json">복원</string>
+    <string name="theme_settings">테마 설정</string>
+    <string name="theme_system">시스템 기본</string>
+    <string name="theme_light">라이트 모드</string>
+    <string name="theme_dark">다크 모드</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_name">기도 알림</string>
+    <string name="notification_channel_description">매일 설정한 시간에 기도 알림을 보냅니다</string>
+    <string name="notification_title">오늘의 기도</string>
+    <string name="notification_permission_title">알림 권한 필요</string>
+    <string name="notification_permission_message">기도 알림을 받으려면 알림 권한이 필요합니다</string>
+    <string name="notification_permission_settings">설정으로 이동</string>
+    
+    <!-- Backup/Restore -->
+    <string name="backup_success">백업이 완료되었습니다</string>
+    <string name="backup_failed">백업에 실패했습니다</string>
+    <string name="restore_success">복원이 완료되었습니다</string>
+    <string name="restore_failed">복원에 실패했습니다</string>
+    
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">기도노트에 오신 것을 환영합니다</string>
+    <string name="onboarding_welcome_description">소중한 기도 대상자와 제목을 체계적으로 관리하세요</string>
+    <string name="onboarding_features_title">주요 기능</string>
+    <string name="onboarding_features_description">요일별 기도 할당, 응답 기록, 통계 확인이 가능합니다</string>
+    <string name="onboarding_notification_title">기도 알림</string>
+    <string name="onboarding_notification_description">매일 설정한 시간에 오늘의 기도를 알려드립니다</string>
+    <string name="skip">건너뛰기</string>
+    <string name="next">다음</string>
+    <string name="start">시작하기</string>
+    
+    <!-- Widget -->
+    <string name="widget_name">오늘의 기도</string>
+    <string name="widget_description">오늘 기도할 대상자와 제목을 확인하세요</string>
+    <string name="widget_no_prayers">오늘의 기도가 없습니다</string>
+</resources>
