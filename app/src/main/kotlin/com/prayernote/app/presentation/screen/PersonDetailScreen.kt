@@ -4,12 +4,15 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.*
@@ -40,25 +43,42 @@ fun PersonDetailScreen(
     val prayerTopics by viewModel.prayerTopics.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
-    var showEditDialog by remember { mutableStateOf<PrayerTopic?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    var isScrolling by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collectLatest { event ->
             when (event) {
                 is PersonDetailEvent.TopicAdded -> {
-                    snackbarHostState.showSnackbar("기도제목이 추가되었습니다")
+                    snackbarHostState.showSnackbar(
+                        message = "기도제목이 추가되었습니다",
+                        duration = SnackbarDuration.Short
+                    )
                     showAddDialog = false
                 }
                 is PersonDetailEvent.TopicUpdated -> {
-                    snackbarHostState.showSnackbar("기도제목이 수정되었습니다")
-                    showEditDialog = null
+                    snackbarHostState.showSnackbar(
+                        message = "기도제목이 수정되었습니다",
+                        duration = SnackbarDuration.Short
+                    )
                 }
                 is PersonDetailEvent.TopicAnswered -> {
-                    snackbarHostState.showSnackbar("응답 완료되었습니다")
+                    snackbarHostState.showSnackbar(
+                        message = "응답 완료되었습니다",
+                        duration = SnackbarDuration.Short
+                    )
                 }
                 is PersonDetailEvent.TopicDeleted -> {
-                    snackbarHostState.showSnackbar("기도제목이 삭제되었습니다")
+                    snackbarHostState.showSnackbar(
+                        message = "기도제목이 삭제되었습니다",
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is PersonDetailEvent.TopicRestored -> {
+                    snackbarHostState.showSnackbar(
+                        message = "진행 중으로 복원되었습니다",
+                        duration = SnackbarDuration.Short
+                    )
                 }
                 is PersonDetailEvent.Error -> {
                     snackbarHostState.showSnackbar(event.message)
@@ -88,10 +108,12 @@ fun PersonDetailScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true }
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_prayer_topic))
+            if (selectedTab == 0 && !isScrolling) {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true }
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_prayer_topic))
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -154,13 +176,15 @@ fun PersonDetailScreen(
                                 topics = prayerTopics,
                                 onReorder = { viewModel.updatePrayerTopicPriorities(it) },
                                 onMarkAsAnswered = { viewModel.markAsAnswered(it) },
-                                onEdit = { showEditDialog = it },
-                                onDelete = { viewModel.deletePrayerTopic(it) }
+                                onEdit = { topic, newTitle -> viewModel.updatePrayerTopicTitle(topic, newTitle) },
+                                onDelete = { viewModel.deletePrayerTopic(it) },
+                                onScrollingChanged = { isScrolling = it }
                             )
                         } else {
                             AnsweredPrayerList(
                                 topics = prayerTopics,
-                                onEdit = { showEditDialog = it },
+                                onEdit = { topic, newTitle -> viewModel.updatePrayerTopicTitle(topic, newTitle) },
+                                onRestore = { viewModel.restoreTopic(it) },
                                 onDelete = { viewModel.deletePrayerTopic(it) }
                             )
                         }
@@ -178,16 +202,6 @@ fun PersonDetailScreen(
             }
         )
     }
-
-    showEditDialog?.let { topic ->
-        EditPrayerTopicDialog(
-            initialTitle = topic.title,
-            onDismiss = { showEditDialog = null },
-            onConfirm = { newTitle ->
-                viewModel.updatePrayerTopicTitle(topic, newTitle)
-            }
-        )
-    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -196,8 +210,9 @@ fun ReorderablePrayerList(
     topics: List<PrayerTopic>,
     onReorder: (List<PrayerTopic>) -> Unit,
     onMarkAsAnswered: (PrayerTopic) -> Unit,
-    onEdit: (PrayerTopic) -> Unit,
-    onDelete: (PrayerTopic) -> Unit
+    onEdit: (PrayerTopic, String) -> Unit,
+    onDelete: (PrayerTopic) -> Unit,
+    onScrollingChanged: (Boolean) -> Unit
 ) {
     var items by remember(topics) { mutableStateOf(topics) }
     val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -205,6 +220,10 @@ fun ReorderablePrayerList(
         items = items.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
+    }
+
+    LaunchedEffect(lazyListState.isScrollInProgress) {
+        onScrollingChanged(lazyListState.isScrollInProgress)
     }
 
     LaunchedEffect(items) {
@@ -228,7 +247,7 @@ fun ReorderablePrayerList(
                     isDragging = isDragging,
                     showAnswerButton = true,
                     onMarkAsAnswered = { onMarkAsAnswered(topic) },
-                    onEdit = { onEdit(topic) },
+                    onEdit = { newTitle -> onEdit(topic, newTitle) },
                     onDelete = { onDelete(topic) },
                     modifier = Modifier.longPressDraggableHandle()
                 )
@@ -240,7 +259,8 @@ fun ReorderablePrayerList(
 @Composable
 fun AnsweredPrayerList(
     topics: List<PrayerTopic>,
-    onEdit: (PrayerTopic) -> Unit,
+    onEdit: (PrayerTopic, String) -> Unit,
+    onRestore: (PrayerTopic) -> Unit,
     onDelete: (PrayerTopic) -> Unit
 ) {
     LazyColumn(
@@ -253,7 +273,8 @@ fun AnsweredPrayerList(
                 isDragging = false,
                 showAnswerButton = false,
                 onMarkAsAnswered = {},
-                onEdit = { onEdit(topic) },
+                onEdit = { newTitle -> onEdit(topic, newTitle) },
+                onRestore = { onRestore(topic) },
                 onDelete = { onDelete(topic) }
             )
         }
@@ -266,10 +287,13 @@ fun PrayerTopicItem(
     isDragging: Boolean,
     showAnswerButton: Boolean,
     onMarkAsAnswered: () -> Unit,
-    onEdit: () -> Unit,
+    onEdit: (String) -> Unit,
+    onRestore: () -> Unit = {},
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showEditDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -281,6 +305,7 @@ fun PrayerTopicItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable { showEditDialog = true }
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -294,9 +319,7 @@ fun PrayerTopicItem(
             }
 
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onEdit() }
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = topic.title,
@@ -319,25 +342,31 @@ fun PrayerTopicItem(
                     )
                 }
             }
-
-            if (showAnswerButton) {
-                IconButton(onClick = onMarkAsAnswered) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.mark_as_answered),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
         }
+    }
+
+    if (showEditDialog) {
+        PrayerTopicEditDialog(
+            topic = topic,
+            showAnswerButton = showAnswerButton,
+            onDismiss = { showEditDialog = false },
+            onConfirm = { newTitle ->
+                showEditDialog = false
+                onEdit(newTitle)
+            },
+            onMarkAsAnswered = {
+                showEditDialog = false
+                onMarkAsAnswered()
+            },
+            onRestore = {
+                showEditDialog = false
+                onRestore()
+            },
+            onDelete = {
+                showEditDialog = false
+                onDelete()
+            }
+        )
     }
 }
 
@@ -366,6 +395,110 @@ fun AddPrayerTopicDialog(
                     if (title.isNotBlank()) {
                         onConfirm(title.trim())
                         onDismiss()
+                    }
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun PrayerTopicEditDialog(
+    topic: PrayerTopic,
+    showAnswerButton: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+    onMarkAsAnswered: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var title by remember { mutableStateOf(topic.title) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("기도제목 수정") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.prayer_topic)) },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    if (showAnswerButton) {
+                        OutlinedButton(
+                            onClick = onMarkAsAnswered,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("응답")
+                        }
+                    } else {
+                        // 응답됨 탭에서는 복원 버튼 표시
+                        OutlinedButton(
+                            onClick = onRestore,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Undo,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("복원")
+                        }
+                    }
+                    
+                    OutlinedButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("삭제")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(title.trim())
                     }
                 },
                 enabled = title.isNotBlank()
@@ -414,6 +547,75 @@ fun EditPrayerTopicDialog(
                 Text(stringResource(R.string.save))
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun PrayerTopicOptionsDialog(
+    showAnswerButton: Boolean,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onMarkAsAnswered: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("기도제목 옵션") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("수정", modifier = Modifier.weight(1f))
+                }
+                
+                if (showAnswerButton) {
+                    TextButton(
+                        onClick = onMarkAsAnswered,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("응답 완료", modifier = Modifier.weight(1f))
+                    }
+                }
+                
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("삭제", modifier = Modifier.weight(1f))
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))

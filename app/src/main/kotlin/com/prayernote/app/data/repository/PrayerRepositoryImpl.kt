@@ -1,5 +1,6 @@
 package com.prayernote.app.data.repository
 
+import android.util.Log
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -7,6 +8,7 @@ import com.prayernote.app.data.local.dao.*
 import com.prayernote.app.data.local.entity.*
 import com.prayernote.app.domain.repository.PrayerRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +34,21 @@ class PrayerRepositoryImpl @Inject constructor(
 
     override fun searchPersons(query: String): Flow<List<Person>> = personDao.searchPersons(query)
 
+    override fun getPersonsByDayOfWeek(dayOfWeek: Int): Flow<List<Person>> = 
+        personDao.getAllPersons().map { persons ->
+            Log.d("PrayerRepository", "getPersonsByDayOfWeek: dayOfWeek=$dayOfWeek, totalPersons=${persons.size}")
+            persons.forEach { person ->
+                Log.d("PrayerRepository", "Person: ${person.name}, dayOfWeekAssignment=${person.dayOfWeekAssignment}")
+            }
+            val filtered = persons.filter { person ->
+                val hasDay = dayOfWeek in person.dayOfWeekAssignment || 7 in person.dayOfWeekAssignment
+                Log.d("PrayerRepository", "Person: ${person.name}, hasDay=$hasDay")
+                hasDay
+            }
+            Log.d("PrayerRepository", "Filtered persons: ${filtered.size}")
+            filtered
+        }
+
     override suspend fun insertPerson(person: Person): Long = personDao.insertPerson(person)
 
     override suspend fun updatePerson(person: Person) = personDao.updatePerson(person)
@@ -54,6 +71,9 @@ class PrayerRepositoryImpl @Inject constructor(
 
     override fun getAnsweredPrayers(): Flow<List<PrayerTopic>> =
         prayerTopicDao.getAnsweredPrayers()
+
+    override fun getAnsweredPrayersWithPerson(): Flow<List<PrayerTopicWithPerson>> =
+        prayerTopicDao.getAnsweredPrayersWithPerson()
 
     override fun getAnsweredPrayersPaged(): Flow<PagingData<PrayerTopic>> = Pager(
         config = PagingConfig(pageSize = 20, enablePlaceholders = false),

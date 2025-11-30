@@ -14,7 +14,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.prayernote.app.R
-import com.prayernote.app.data.local.dao.PersonWithDay
 import com.prayernote.app.data.local.entity.Person
 import com.prayernote.app.presentation.viewmodel.DayAssignmentEvent
 import com.prayernote.app.presentation.viewmodel.DayAssignmentViewModel
@@ -110,10 +109,10 @@ fun DayAssignmentScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp)
                 ) {
-                    items(assignedPersons, key = { it.person.id }) { personWithDay ->
+                    items(assignedPersons, key = { it.id }) { person ->
                         AssignedPersonItem(
-                            person = personWithDay.person,
-                            onUnassign = { viewModel.unassignPerson(personWithDay.person.id) }
+                            person = person,
+                            onUnassign = { viewModel.unassignPerson(person.id) }
                         )
                     }
                 }

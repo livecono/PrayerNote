@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.prayernote.app.data.local.entity.PrayerTopic
+import com.prayernote.app.data.local.entity.PrayerTopicWithPerson
 import com.prayernote.app.domain.repository.PrayerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -32,6 +33,16 @@ class AnsweredPrayersViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    val answeredPrayersWithPerson: StateFlow<List<PrayerTopicWithPerson>> = repository.getAnsweredPrayersWithPerson()
+        .catch { exception ->
+            _uiState.value = AnsweredPrayersUiState.Error(exception.message ?: "알 수 없는 오류")
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     val answeredPrayersPaged: Flow<PagingData<PrayerTopic>> = repository.getAnsweredPrayersPaged()
         .cachedIn(viewModelScope)
 
@@ -43,11 +54,11 @@ class AnsweredPrayersViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.value = AnsweredPrayersUiState.Loading
-                answeredPrayers.collect { prayers ->
+                answeredPrayersWithPerson.collect { prayers ->
                     _uiState.value = if (prayers.isEmpty()) {
                         AnsweredPrayersUiState.Empty
                     } else {
-                        AnsweredPrayersUiState.Success(prayers)
+                        AnsweredPrayersUiState.Success(prayers.map { it.prayerTopic })
                     }
                 }
             } catch (e: Exception) {
@@ -56,10 +67,10 @@ class AnsweredPrayersViewModel @Inject constructor(
         }
     }
 
-    fun getGroupedByMonth(): Map<String, List<PrayerTopic>> {
-        val prayers = answeredPrayers.value
-        return prayers.groupBy { prayer ->
-            prayer.answeredAt?.let {
+    fun getGroupedByMonth(): Map<String, List<PrayerTopicWithPerson>> {
+        val prayers = answeredPrayersWithPerson.value
+        return prayers.groupBy { prayerWithPerson ->
+            prayerWithPerson.prayerTopic.answeredAt?.let {
                 val calendar = java.util.Calendar.getInstance()
                 calendar.time = it
                 "${calendar.get(java.util.Calendar.YEAR)}년 ${calendar.get(java.util.Calendar.MONTH) + 1}월"
@@ -77,6 +88,21 @@ class AnsweredPrayersViewModel @Inject constructor(
             }
         }
     }
+
+    fun restoreTopic(topic: PrayerTopic) {
+        viewModelScope.launch {
+            try {
+                val restoredTopic = topic.copy(
+                    status = com.prayernote.app.data.local.entity.PrayerStatus.ACTIVE,
+                    answeredAt = null
+                )
+                repository.updatePrayerTopic(restoredTopic)
+                _uiEvent.emit(AnsweredPrayersEvent.TopicRestored)
+            } catch (e: Exception) {
+                _uiEvent.emit(AnsweredPrayersEvent.Error(e.message ?: "복원 실패"))
+            }
+        }
+    }
 }
 
 sealed class AnsweredPrayersUiState {
@@ -88,5 +114,6 @@ sealed class AnsweredPrayersUiState {
 
 sealed class AnsweredPrayersEvent {
     object TopicDeleted : AnsweredPrayersEvent()
+    object TopicRestored : AnsweredPrayersEvent()
     data class Error(val message: String) : AnsweredPrayersEvent()
 }

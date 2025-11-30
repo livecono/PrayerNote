@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.prayernote.app.R
 import com.prayernote.app.data.local.entity.PrayerTopic
+import com.prayernote.app.data.local.entity.PrayerTopicWithPerson
 import com.prayernote.app.presentation.viewmodel.AnsweredPrayersUiState
 import com.prayernote.app.presentation.viewmodel.AnsweredPrayersViewModel
 import com.prayernote.app.presentation.viewmodel.AnsweredPrayersEvent
@@ -34,6 +36,9 @@ fun AnsweredPrayersScreen(
             when (event) {
                 is AnsweredPrayersEvent.TopicDeleted -> {
                     snackbarHostState.showSnackbar("기도제목이 삭제되었습니다")
+                }
+                is AnsweredPrayersEvent.TopicRestored -> {
+                    snackbarHostState.showSnackbar("진행 중으로 복원되었습니다")
                 }
                 is AnsweredPrayersEvent.Error -> {
                     snackbarHostState.showSnackbar(event.message)
@@ -98,10 +103,11 @@ fun AnsweredPrayersScreen(
                             )
                         }
                         
-                        items(prayers, key = { it.id }) { prayer ->
+                        items(prayers, key = { it.prayerTopic.id }) { prayerWithPerson ->
                             AnsweredPrayerItem(
-                                prayer = prayer,
-                                onDelete = { viewModel.deletePrayerTopic(prayer) }
+                                prayerWithPerson = prayerWithPerson,
+                                onRestore = { viewModel.restoreTopic(prayerWithPerson.prayerTopic) },
+                                onDelete = { viewModel.deletePrayerTopic(prayerWithPerson.prayerTopic) }
                             )
                         }
                     }
@@ -113,7 +119,8 @@ fun AnsweredPrayersScreen(
 
 @Composable
 fun AnsweredPrayerItem(
-    prayer: PrayerTopic,
+    prayerWithPerson: PrayerTopicWithPerson,
+    onRestore: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -136,24 +143,40 @@ fun AnsweredPrayerItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = prayer.title,
+                    text = prayerWithPerson.person.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = prayerWithPerson.prayerTopic.title,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                if (prayer.answeredAt != null) {
+                if (prayerWithPerson.prayerTopic.answeredAt != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "응답: ${com.prayernote.app.presentation.screen.formatDate(prayer.answeredAt)}",
+                        text = "응답: ${com.prayernote.app.presentation.screen.formatDate(prayerWithPerson.prayerTopic.answeredAt)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.error
-                )
+            Row {
+                IconButton(onClick = onRestore) {
+                    Icon(
+                        imageVector = Icons.Filled.Undo,
+                        contentDescription = "복원",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

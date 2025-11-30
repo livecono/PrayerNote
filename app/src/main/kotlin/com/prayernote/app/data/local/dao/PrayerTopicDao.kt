@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.room.*
 import com.prayernote.app.data.local.entity.PrayerStatus
 import com.prayernote.app.data.local.entity.PrayerTopic
+import com.prayernote.app.data.local.entity.PrayerTopicWithPerson
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -19,6 +20,10 @@ interface PrayerTopicDao {
 
     @Query("SELECT * FROM prayer_topics WHERE status = :status ORDER BY answeredAt DESC")
     fun getAnsweredPrayers(status: PrayerStatus = PrayerStatus.ANSWERED): Flow<List<PrayerTopic>>
+
+    @Transaction
+    @Query("SELECT * FROM prayer_topics WHERE status = :status ORDER BY answeredAt DESC")
+    fun getAnsweredPrayersWithPerson(status: PrayerStatus = PrayerStatus.ANSWERED): Flow<List<PrayerTopicWithPerson>>
 
     @Query("SELECT * FROM prayer_topics WHERE status = :status ORDER BY answeredAt DESC")
     fun getAnsweredPrayersPaged(status: PrayerStatus = PrayerStatus.ANSWERED): PagingSource<Int, PrayerTopic>

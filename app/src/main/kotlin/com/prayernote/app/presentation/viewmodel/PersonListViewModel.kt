@@ -80,6 +80,22 @@ class PersonListViewModel @Inject constructor(
         }
     }
 
+    fun updatePerson(person: Person, name: String, memo: String, dayOfWeekAssignment: Set<Int>) {
+        viewModelScope.launch {
+            try {
+                val updatedPerson = person.copy(
+                    name = name,
+                    memo = memo,
+                    dayOfWeekAssignment = dayOfWeekAssignment
+                )
+                repository.updatePerson(updatedPerson)
+                _uiEvent.emit(PersonListEvent.PersonUpdated)
+            } catch (e: Exception) {
+                _uiEvent.emit(PersonListEvent.Error(e.message ?: "수정 실패"))
+            }
+        }
+    }
+
     fun deletePerson(person: Person) {
         viewModelScope.launch {
             try {
@@ -104,6 +120,7 @@ sealed class PersonListUiState {
 
 sealed class PersonListEvent {
     object PersonAdded : PersonListEvent()
+    object PersonUpdated : PersonListEvent()
     object PersonDeleted : PersonListEvent()
     data class Error(val message: String) : PersonListEvent()
 }

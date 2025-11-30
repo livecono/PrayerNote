@@ -14,7 +14,7 @@ import com.prayernote.app.data.local.entity.*
         PrayerHistory::class,
         AlarmTime::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

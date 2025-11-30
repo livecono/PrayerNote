@@ -1,5 +1,6 @@
 package com.prayernote.app.presentation.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -53,7 +54,9 @@ class PersonDetailViewModel @Inject constructor(
     private fun loadPrayerTopics() {
         viewModelScope.launch {
             val status = if (selectedTab.value == 0) PrayerStatus.ACTIVE else PrayerStatus.ANSWERED
+            Log.d("PersonDetailVM", "Loading topics for personId=$personId, status=$status")
             repository.getPrayerTopicsByPersonAndStatus(personId, status).collect { topics ->
+                Log.d("PersonDetailVM", "Loaded ${topics.size} topics")
                 _prayerTopics.value = topics
             }
         }
@@ -73,9 +76,12 @@ class PersonDetailViewModel @Inject constructor(
                     title = title,
                     priority = maxPriority + 1
                 )
-                repository.insertPrayerTopic(topic)
+                Log.d("PersonDetailVM", "Adding topic: personId=$personId, title=$title, priority=${topic.priority}")
+                val insertedId = repository.insertPrayerTopic(topic)
+                Log.d("PersonDetailVM", "Topic inserted with ID: $insertedId")
                 _uiEvent.emit(PersonDetailEvent.TopicAdded)
             } catch (e: Exception) {
+                Log.e("PersonDetailVM", "Failed to add topic", e)
                 _uiEvent.emit(PersonDetailEvent.Error(e.message ?: "추가 실패"))
             }
         }
@@ -132,6 +138,21 @@ class PersonDetailViewModel @Inject constructor(
         }
     }
 
+    fun restoreTopic(topic: PrayerTopic) {
+        viewModelScope.launch {
+            try {
+                val restoredTopic = topic.copy(
+                    status = PrayerStatus.ACTIVE,
+                    answeredAt = null
+                )
+                repository.updatePrayerTopic(restoredTopic)
+                _uiEvent.emit(PersonDetailEvent.TopicRestored)
+            } catch (e: Exception) {
+                _uiEvent.emit(PersonDetailEvent.Error(e.message ?: "복원 실패"))
+            }
+        }
+    }
+
     private val _uiEvent = MutableSharedFlow<PersonDetailEvent>()
     val uiEvent: SharedFlow<PersonDetailEvent> = _uiEvent.asSharedFlow()
 }
@@ -147,5 +168,6 @@ sealed class PersonDetailEvent {
     object TopicUpdated : PersonDetailEvent()
     object TopicAnswered : PersonDetailEvent()
     object TopicDeleted : PersonDetailEvent()
+    object TopicRestored : PersonDetailEvent()
     data class Error(val message: String) : PersonDetailEvent()
 }

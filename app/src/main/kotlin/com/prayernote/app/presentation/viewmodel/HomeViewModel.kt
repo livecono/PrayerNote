@@ -1,5 +1,6 @@
 package com.prayernote.app.presentation.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.prayernote.app.data.local.entity.Person
@@ -37,25 +38,32 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = HomeUiState.Loading
                 val calendar = Calendar.getInstance()
                 val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
+                Log.d("HomeViewModel", "loadTodayPrayers: dayOfWeek=$dayOfWeek")
 
-                repository.getPersonsByDay(dayOfWeek).collect { persons ->
-                    if (persons.isEmpty()) {
-                        _uiState.value = HomeUiState.Empty
-                        _todayPrayers.value = emptyMap()
-                    } else {
-                        val prayersMap = mutableMapOf<Person, List<PrayerTopic>>()
-                        
-                        persons.forEach { personWithDay ->
-                            val topics = repository.getPrayerTopicsByPersonAndStatus(
-                                personWithDay.person.id,
-                                PrayerStatus.ACTIVE
-                            ).first()
-                            
-                            if (topics.isNotEmpty()) {
-                                prayersMap[personWithDay.person] = topics
+                repository.getPersonsByDayOfWeek(dayOfWeek)
+                    .flatMapLatest { persons ->
+                        Log.d("HomeViewModel", "Persons for today: ${persons.size}")
+                        if (persons.isEmpty()) {
+                            flowOf(emptyMap<Person, List<PrayerTopic>>())
+                        } else {
+                            // 각 Person의 기도제목 Flow를 결합
+                            combine(
+                                persons.map { person ->
+                                    repository.getPrayerTopicsByPersonAndStatus(
+                                        person.id,
+                                        PrayerStatus.ACTIVE
+                                    ).map { topics ->
+                                        Log.d("HomeViewModel", "Person ${person.name} has ${topics.size} topics")
+                                        person to topics
+                                    }
+                                }
+                            ) { topicsArray ->
+                                topicsArray.toMap()
                             }
                         }
-
+                    }
+                    .collect { prayersMap ->
+                        Log.d("HomeViewModel", "Total persons: ${prayersMap.size}")
                         if (prayersMap.isEmpty()) {
                             _uiState.value = HomeUiState.Empty
                             _todayPrayers.value = emptyMap()
@@ -64,8 +72,8 @@ class HomeViewModel @Inject constructor(
                             _todayPrayers.value = prayersMap
                         }
                     }
-                }
             } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error loading prayers", e)
                 _uiState.value = HomeUiState.Error(e.message ?: "알 수 없는 오류")
             }
         }

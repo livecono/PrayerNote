@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,7 +34,7 @@ fun HomeScreen(
     val todayPrayers by viewModel.todayPrayers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val dayNames = listOf("일", "월", "화", "수", "목", "금", "토")
+    val dayNames = listOf("주일", "월", "화", "수", "목", "금", "토")
     val calendar = Calendar.getInstance()
     val todayDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
 
@@ -57,7 +58,7 @@ fun HomeScreen(
                     Column {
                         Text(stringResource(R.string.nav_home))
                         Text(
-                            text = "오늘은 ${dayNames[todayDayOfWeek]}요일",
+                            text = if (todayDayOfWeek == 0) "오늘은 ${dayNames[todayDayOfWeek]}" else "오늘은 ${dayNames[todayDayOfWeek]}요일",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -176,40 +177,69 @@ fun PrayerTopicCard(
     topic: PrayerTopic,
     onMarkAsAnswered: () -> Unit
 ) {
+    var showOptionsDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp, horizontal = 8.dp),
+            .padding(vertical = 4.dp, horizontal = 8.dp)
+            .clickable { showOptionsDialog = true },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = topic.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "등록일: ${formatDate(topic.createdAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = onMarkAsAnswered) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = "응답 완료",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Text(
+                text = topic.title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+    }
+
+    if (showOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showOptionsDialog = false },
+            title = { Text("기도 응답") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = topic.title,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "이 기도가 응답되었나요?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOptionsDialog = false
+                        onMarkAsAnswered()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("응답 완료")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOptionsDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }

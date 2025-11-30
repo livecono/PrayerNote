@@ -10,5 +10,6 @@ data class Person(
     val id: Long = 0,
     val name: String,
     val memo: String = "",
+    val dayOfWeekAssignment: Set<Int> = emptySet(), // 0-6: 일-토, 7: 매일
     val createdAt: Date = Date()
 )

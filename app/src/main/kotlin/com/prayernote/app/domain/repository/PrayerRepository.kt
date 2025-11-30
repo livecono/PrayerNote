@@ -14,6 +14,7 @@ interface PrayerRepository {
     fun getAllPersonsPaged(): Flow<PagingData<Person>>
     fun getPersonById(personId: Long): Flow<Person?>
     fun searchPersons(query: String): Flow<List<Person>>
+    fun getPersonsByDayOfWeek(dayOfWeek: Int): Flow<List<Person>>
     suspend fun insertPerson(person: Person): Long
     suspend fun updatePerson(person: Person)
     suspend fun deletePerson(person: Person)
@@ -24,6 +25,7 @@ interface PrayerRepository {
     fun getPrayerTopicsByPerson(personId: Long): Flow<List<PrayerTopic>>
     fun getPrayerTopicById(topicId: Long): Flow<PrayerTopic?>
     fun getAnsweredPrayers(): Flow<List<PrayerTopic>>
+    fun getAnsweredPrayersWithPerson(): Flow<List<PrayerTopicWithPerson>>
     fun getAnsweredPrayersPaged(): Flow<PagingData<PrayerTopic>>
     suspend fun insertPrayerTopic(prayerTopic: PrayerTopic): Long
     suspend fun updatePrayerTopic(prayerTopic: PrayerTopic)

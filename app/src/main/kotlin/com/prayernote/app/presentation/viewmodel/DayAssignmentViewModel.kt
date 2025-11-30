@@ -2,8 +2,6 @@ package com.prayernote.app.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.prayernote.app.data.local.dao.PersonWithDay
-import com.prayernote.app.data.local.entity.DayAssignment
 import com.prayernote.app.data.local.entity.Person
 import com.prayernote.app.domain.repository.PrayerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,8 +17,8 @@ class DayAssignmentViewModel @Inject constructor(
     private val _selectedDay = MutableStateFlow(0)
     val selectedDay: StateFlow<Int> = _selectedDay.asStateFlow()
 
-    private val _assignedPersons = MutableStateFlow<List<PersonWithDay>>(emptyList())
-    val assignedPersons: StateFlow<List<PersonWithDay>> = _assignedPersons.asStateFlow()
+    private val _assignedPersons = MutableStateFlow<List<Person>>(emptyList())
+    val assignedPersons: StateFlow<List<Person>> = _assignedPersons.asStateFlow()
 
     private val _allPersons = MutableStateFlow<List<Person>>(emptyList())
     val allPersons: StateFlow<List<Person>> = _allPersons.asStateFlow()
@@ -43,7 +41,7 @@ class DayAssignmentViewModel @Inject constructor(
 
     private fun loadAssignedPersons() {
         viewModelScope.launch {
-            repository.getPersonsByDay(selectedDay.value).collect { persons ->
+            repository.getPersonsByDayOfWeek(selectedDay.value).collect { persons ->
                 _assignedPersons.value = persons
             }
         }
@@ -65,11 +63,10 @@ class DayAssignmentViewModel @Inject constructor(
     fun assignPerson(personId: Long) {
         viewModelScope.launch {
             try {
-                val assignment = DayAssignment(
-                    personId = personId,
-                    dayOfWeek = selectedDay.value
-                )
-                repository.insertAssignment(assignment)
+                val person = allPersons.value.find { it.id == personId } ?: return@launch
+                val updatedDays = person.dayOfWeekAssignment + selectedDay.value
+                val updatedPerson = person.copy(dayOfWeekAssignment = updatedDays)
+                repository.updatePerson(updatedPerson)
                 _uiEvent.emit(DayAssignmentEvent.PersonAssigned)
             } catch (e: Exception) {
                 _uiEvent.emit(DayAssignmentEvent.Error(e.message ?: "할당 실패"))
@@ -80,7 +77,10 @@ class DayAssignmentViewModel @Inject constructor(
     fun unassignPerson(personId: Long) {
         viewModelScope.launch {
             try {
-                repository.deleteAssignment(personId, selectedDay.value)
+                val person = assignedPersons.value.find { it.id == personId } ?: return@launch
+                val updatedDays = person.dayOfWeekAssignment - selectedDay.value
+                val updatedPerson = person.copy(dayOfWeekAssignment = updatedDays)
+                repository.updatePerson(updatedPerson)
                 _uiEvent.emit(DayAssignmentEvent.PersonUnassigned)
             } catch (e: Exception) {
                 _uiEvent.emit(DayAssignmentEvent.Error(e.message ?: "할당 해제 실패"))
@@ -89,7 +89,7 @@ class DayAssignmentViewModel @Inject constructor(
     }
 
     fun getAvailablePersons(): List<Person> {
-        val assignedIds = assignedPersons.value.map { it.person.id }.toSet()
+        val assignedIds = assignedPersons.value.map { it.id }.toSet()
         return allPersons.value.filter { it.id !in assignedIds }
     }
 

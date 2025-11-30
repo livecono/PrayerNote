@@ -2,6 +2,8 @@ package com.prayernote.app.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.prayernote.app.data.local.PrayerDatabase
 import com.prayernote.app.data.local.dao.*
 import dagger.Module
@@ -15,6 +17,13 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Person 테이블에 dayOfWeekAssignment 컬럼 추가
+            db.execSQL("ALTER TABLE persons ADD COLUMN dayOfWeekAssignment TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
     @Provides
     @Singleton
     fun providePrayerDatabase(
@@ -25,6 +34,7 @@ object DatabaseModule {
             PrayerDatabase::class.java,
             PrayerDatabase.DATABASE_NAME
         )
+            .addMigrations(MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
     }

@@ -24,4 +24,15 @@ class Converters {
     fun toPrayerStatus(status: String): PrayerStatus {
         return PrayerStatus.valueOf(status)
     }
+
+    @TypeConverter
+    fun fromIntSet(value: Set<Int>): String {
+        return value.joinToString(",")
+    }
+
+    @TypeConverter
+    fun toIntSet(value: String): Set<Int> {
+        return if (value.isEmpty()) emptySet()
+        else value.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    }
 }
