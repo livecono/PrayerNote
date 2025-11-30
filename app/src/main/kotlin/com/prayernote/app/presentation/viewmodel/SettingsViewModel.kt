@@ -83,6 +83,19 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun updateAlarmTime(alarm: AlarmTime, hour: Int, minute: Int) {
+        viewModelScope.launch {
+            try {
+                val updatedAlarm = alarm.copy(hour = hour, minute = minute)
+                repository.updateAlarm(updatedAlarm)
+                alarmScheduler.scheduleAlarm(updatedAlarm)
+                _uiEvent.emit(SettingsEvent.AlarmUpdated)
+            } catch (e: Exception) {
+                _uiEvent.emit(SettingsEvent.Error(e.message ?: "알림 시간 업데이트 실패"))
+            }
+        }
+    }
+
     fun deleteAlarm(alarm: AlarmTime) {
         viewModelScope.launch {
             try {
@@ -118,6 +131,10 @@ class SettingsViewModel @Inject constructor(
             // Save to DataStore
             _uiEvent.emit(SettingsEvent.ThemeChanged)
         }
+    }
+
+    fun canScheduleExactAlarms(): Boolean {
+        return alarmScheduler.canScheduleExactAlarms()
     }
 
     fun backupToJson() {

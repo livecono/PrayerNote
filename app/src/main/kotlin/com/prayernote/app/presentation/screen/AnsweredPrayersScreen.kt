@@ -3,6 +3,8 @@ package com.prayernote.app.presentation.screen
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +17,8 @@ import com.prayernote.app.R
 import com.prayernote.app.data.local.entity.PrayerTopic
 import com.prayernote.app.presentation.viewmodel.AnsweredPrayersUiState
 import com.prayernote.app.presentation.viewmodel.AnsweredPrayersViewModel
+import com.prayernote.app.presentation.viewmodel.AnsweredPrayersEvent
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,6 +27,20 @@ fun AnsweredPrayersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val answeredPrayers by viewModel.answeredPrayers.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collectLatest { event ->
+            when (event) {
+                is AnsweredPrayersEvent.TopicDeleted -> {
+                    snackbarHostState.showSnackbar("기도제목이 삭제되었습니다")
+                }
+                is AnsweredPrayersEvent.Error -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -33,7 +51,8 @@ fun AnsweredPrayersScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         when (uiState) {
             is AnsweredPrayersUiState.Loading -> {
@@ -80,7 +99,10 @@ fun AnsweredPrayersScreen(
                         }
                         
                         items(prayers, key = { it.id }) { prayer ->
-                            AnsweredPrayerItem(prayer = prayer)
+                            AnsweredPrayerItem(
+                                prayer = prayer,
+                                onDelete = { viewModel.deletePrayerTopic(prayer) }
+                            )
                         }
                     }
                 }
@@ -90,7 +112,10 @@ fun AnsweredPrayersScreen(
 }
 
 @Composable
-fun AnsweredPrayerItem(prayer: PrayerTopic) {
+fun AnsweredPrayerItem(
+    prayer: PrayerTopic,
+    onDelete: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -100,21 +125,34 @@ fun AnsweredPrayerItem(prayer: PrayerTopic) {
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
         )
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = prayer.title,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            if (prayer.answeredAt != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    text = "응답: ${com.prayernote.app.presentation.screen.formatDate(prayer.answeredAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    text = prayer.title,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                if (prayer.answeredAt != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "응답: ${com.prayernote.app.presentation.screen.formatDate(prayer.answeredAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.delete),
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }

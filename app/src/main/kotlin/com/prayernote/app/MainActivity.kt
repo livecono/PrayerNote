@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 val startDestination = if (isFirstLaunch) {
                     Screen.Onboarding.route
                 } else {
-                    Screen.PersonList.route
+                    Screen.Home.route
                 }
 
                 Scaffold(

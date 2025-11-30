@@ -19,6 +19,9 @@ class AnsweredPrayersViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AnsweredPrayersUiState>(AnsweredPrayersUiState.Loading)
     val uiState: StateFlow<AnsweredPrayersUiState> = _uiState.asStateFlow()
 
+    private val _uiEvent = MutableSharedFlow<AnsweredPrayersEvent>()
+    val uiEvent: SharedFlow<AnsweredPrayersEvent> = _uiEvent.asSharedFlow()
+
     val answeredPrayers: StateFlow<List<PrayerTopic>> = repository.getAnsweredPrayers()
         .catch { exception ->
             _uiState.value = AnsweredPrayersUiState.Error(exception.message ?: "알 수 없는 오류")
@@ -63,6 +66,17 @@ class AnsweredPrayersViewModel @Inject constructor(
             } ?: "날짜 없음"
         }
     }
+
+    fun deletePrayerTopic(topic: PrayerTopic) {
+        viewModelScope.launch {
+            try {
+                repository.deletePrayerTopic(topic)
+                _uiEvent.emit(AnsweredPrayersEvent.TopicDeleted)
+            } catch (e: Exception) {
+                _uiEvent.emit(AnsweredPrayersEvent.Error(e.message ?: "삭제 실패"))
+            }
+        }
+    }
 }
 
 sealed class AnsweredPrayersUiState {
@@ -70,4 +84,9 @@ sealed class AnsweredPrayersUiState {
     object Empty : AnsweredPrayersUiState()
     data class Success(val prayers: List<PrayerTopic>) : AnsweredPrayersUiState()
     data class Error(val message: String) : AnsweredPrayersUiState()
+}
+
+sealed class AnsweredPrayersEvent {
+    object TopicDeleted : AnsweredPrayersEvent()
+    data class Error(val message: String) : AnsweredPrayersEvent()
 }

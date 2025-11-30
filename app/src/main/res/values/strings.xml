@@ -3,6 +3,7 @@
     
     <!-- Navigation -->
     <string name="nav_home">홈</string>
+    <string name="nav_person_list">대상자</string>
     <string name="nav_day_assignment">요일별</string>
     <string name="nav_answered">응답 목록</string>
     <string name="nav_statistics">통계</string>
@@ -18,6 +19,7 @@
     <string name="ok">확인</string>
     
     <!-- Person -->
+    <string name="person_list_title">대상자 관리</string>
     <string name="person_name">이름</string>
     <string name="person_memo">메모</string>
     <string name="add_person">대상자 추가</string>
@@ -35,13 +37,13 @@
     
     <!-- Day Assignment -->
     <string name="day_assignment">요일별 할당</string>
-    <string name="monday">월요일</string>
-    <string name="tuesday">화요일</string>
-    <string name="wednesday">수요일</string>
-    <string name="thursday">목요일</string>
-    <string name="friday">금요일</string>
-    <string name="saturday">토요일</string>
-    <string name="sunday">일요일</string>
+    <string name="monday">월</string>
+    <string name="tuesday">화</string>
+    <string name="wednesday">수</string>
+    <string name="thursday">목</string>
+    <string name="friday">금</string>
+    <string name="saturday">토</string>
+    <string name="sunday">일</string>
     <string name="assign_person">대상자 할당</string>
     <string name="no_assignment">할당된 대상자가 없습니다</string>
     

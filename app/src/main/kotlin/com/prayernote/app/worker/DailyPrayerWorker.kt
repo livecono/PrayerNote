@@ -46,9 +46,10 @@ class DailyPrayerWorker @AssistedInject constructor(
             // Get persons assigned to today
             val personsToday = repository.getPersonsByDay(dayOfWeek).first()
 
+            val prayerTopics = mutableListOf<Pair<String, String>>()
+
             if (personsToday.isNotEmpty()) {
                 // Get prayer topics for each person (max 3 topics total, prioritized)
-                val prayerTopics = mutableListOf<Pair<String, String>>() // Pair<PersonName, TopicTitle>
                 
                 for (personWithDay in personsToday) {
                     val topics = repository.getPrayerTopicsByPersonAndStatus(
@@ -75,15 +76,21 @@ class DailyPrayerWorker @AssistedInject constructor(
 
                     if (prayerTopics.size >= 3) break
                 }
+            }
 
-                if (prayerTopics.isNotEmpty()) {
-                    showNotification(prayerTopics, dayOfWeek)
-                }
+            // Show notification even if no data (for testing)
+            if (prayerTopics.isNotEmpty()) {
+                showNotification(prayerTopics, dayOfWeek)
+            } else {
+                // Show test notification when no data
+                showTestNotification(dayOfWeek)
             }
 
             Result.success()
         } catch (e: Exception) {
             e.printStackTrace()
+            // Show error notification for debugging
+            showErrorNotification(e.message ?: "Unknown error")
             Result.failure()
         }
     }
@@ -113,7 +120,7 @@ class DailyPrayerWorker @AssistedInject constructor(
         )
 
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_launcher_background)
             .setContentTitle(context.getString(R.string.notification_title))
             .setContentText(if (prayerTopics.size == 1) contentText else "${prayerTopics.size}개의 기도제목")
             .setStyle(
@@ -123,6 +130,7 @@ class DailyPrayerWorker @AssistedInject constructor(
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         // Check notification permission (Android 13+)
@@ -152,4 +160,91 @@ class DailyPrayerWorker @AssistedInject constructor(
             notificationManager.createNotificationChannel(channel)
         }
     }
+
+    private fun showTestNotification(dayOfWeek: Int) {
+        createNotificationChannel()
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_background)
+            .setContentTitle("기도 알림 테스트")
+            .setContentText("오늘은 ${getDayName(dayOfWeek)}입니다. 할당된 기도 대상자가 없습니다.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+        }
+
+        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun showErrorNotification(error: String) {
+        createNotificationChannel()
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_background)
+            .setContentTitle("알림 오류")
+            .setContentText("알림 처리 중 오류: $error")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+        }
+
+        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID + 1, notification)
+    }
+
+    private fun getDayName(dayOfWeek: Int): String {
+        return when (dayOfWeek) {
+            0 -> "일요일"
+            1 -> "월요일"
+            2 -> "화요일"
+            3 -> "수요일"
+            4 -> "목요일"
+            5 -> "금요일"
+            6 -> "토요일"
+            else -> "알 수 없음"
+        }
+    }
 }
+

@@ -1,5 +1,6 @@
 package com.prayernote.app.presentation.screen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -15,6 +16,7 @@ import com.prayernote.app.R
 import com.prayernote.app.data.datastore.PreferencesDataStore
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
     preferencesDataStore: PreferencesDataStore,

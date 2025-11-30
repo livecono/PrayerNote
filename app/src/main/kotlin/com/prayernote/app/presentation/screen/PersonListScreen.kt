@@ -56,7 +56,7 @@ fun PersonListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.nav_home)) },
+                title = { Text(stringResource(R.string.person_list_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -227,6 +227,7 @@ fun AddPersonDialog(
                 onClick = {
                     if (name.isNotBlank()) {
                         onConfirm(name.trim(), memo.trim())
+                        onDismiss()
                     }
                 },
                 enabled = name.isNotBlank()

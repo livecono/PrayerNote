@@ -81,9 +81,8 @@ fun DayAssignmentScreen(
                 .padding(paddingValues)
         ) {
             // Day Tabs
-            ScrollableTabRow(
-                selectedTabIndex = selectedDay,
-                edgePadding = 0.dp
+            TabRow(
+                selectedTabIndex = selectedDay
             ) {
                 dayNames.forEachIndexed { index, day ->
                     Tab(

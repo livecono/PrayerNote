@@ -1,5 +1,6 @@
 package com.prayernote.app.presentation.screen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.*
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +40,7 @@ fun PersonDetailScreen(
     val prayerTopics by viewModel.prayerTopics.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf<PrayerTopic?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -46,6 +49,10 @@ fun PersonDetailScreen(
                 is PersonDetailEvent.TopicAdded -> {
                     snackbarHostState.showSnackbar("기도제목이 추가되었습니다")
                     showAddDialog = false
+                }
+                is PersonDetailEvent.TopicUpdated -> {
+                    snackbarHostState.showSnackbar("기도제목이 수정되었습니다")
+                    showEditDialog = null
                 }
                 is PersonDetailEvent.TopicAnswered -> {
                     snackbarHostState.showSnackbar("응답 완료되었습니다")
@@ -147,11 +154,13 @@ fun PersonDetailScreen(
                                 topics = prayerTopics,
                                 onReorder = { viewModel.updatePrayerTopicPriorities(it) },
                                 onMarkAsAnswered = { viewModel.markAsAnswered(it) },
+                                onEdit = { showEditDialog = it },
                                 onDelete = { viewModel.deletePrayerTopic(it) }
                             )
                         } else {
                             AnsweredPrayerList(
                                 topics = prayerTopics,
+                                onEdit = { showEditDialog = it },
                                 onDelete = { viewModel.deletePrayerTopic(it) }
                             )
                         }
@@ -169,19 +178,30 @@ fun PersonDetailScreen(
             }
         )
     }
+
+    showEditDialog?.let { topic ->
+        EditPrayerTopicDialog(
+            initialTitle = topic.title,
+            onDismiss = { showEditDialog = null },
+            onConfirm = { newTitle ->
+                viewModel.updatePrayerTopicTitle(topic, newTitle)
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReorderablePrayerList(
     topics: List<PrayerTopic>,
     onReorder: (List<PrayerTopic>) -> Unit,
     onMarkAsAnswered: (PrayerTopic) -> Unit,
+    onEdit: (PrayerTopic) -> Unit,
     onDelete: (PrayerTopic) -> Unit
 ) {
     var items by remember(topics) { mutableStateOf(topics) }
-    val reorderableLazyListState = rememberReorderableLazyListState(
-        lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
-    ) { from, to ->
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
         items = items.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
@@ -194,7 +214,7 @@ fun ReorderablePrayerList(
     }
 
     LazyColumn(
-        state = reorderableLazyListState.lazyListState,
+        state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp)
     ) {
@@ -208,6 +228,7 @@ fun ReorderablePrayerList(
                     isDragging = isDragging,
                     showAnswerButton = true,
                     onMarkAsAnswered = { onMarkAsAnswered(topic) },
+                    onEdit = { onEdit(topic) },
                     onDelete = { onDelete(topic) },
                     modifier = Modifier.longPressDraggableHandle()
                 )
@@ -219,6 +240,7 @@ fun ReorderablePrayerList(
 @Composable
 fun AnsweredPrayerList(
     topics: List<PrayerTopic>,
+    onEdit: (PrayerTopic) -> Unit,
     onDelete: (PrayerTopic) -> Unit
 ) {
     LazyColumn(
@@ -231,6 +253,7 @@ fun AnsweredPrayerList(
                 isDragging = false,
                 showAnswerButton = false,
                 onMarkAsAnswered = {},
+                onEdit = { onEdit(topic) },
                 onDelete = { onDelete(topic) }
             )
         }
@@ -243,6 +266,7 @@ fun PrayerTopicItem(
     isDragging: Boolean,
     showAnswerButton: Boolean,
     onMarkAsAnswered: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -270,7 +294,9 @@ fun PrayerTopicItem(
             }
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onEdit() }
             ) {
                 Text(
                     text = topic.title,
@@ -278,8 +304,14 @@ fun PrayerTopicItem(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "등록일: ${formatDate(topic.createdAt)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 if (topic.status == PrayerStatus.ANSWERED && topic.answeredAt != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "응답: ${formatDate(topic.answeredAt)}",
                         style = MaterialTheme.typography.bodySmall,
@@ -333,6 +365,48 @@ fun AddPrayerTopicDialog(
                 onClick = {
                     if (title.isNotBlank()) {
                         onConfirm(title.trim())
+                        onDismiss()
+                    }
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun EditPrayerTopicDialog(
+    initialTitle: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var title by remember { mutableStateOf(initialTitle) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("기도제목 수정") },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(stringResource(R.string.prayer_topic)) },
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(title.trim())
+                        onDismiss()
                     }
                 },
                 enabled = title.isNotBlank()

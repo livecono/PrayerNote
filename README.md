@@ -61,11 +61,9 @@ app/
 
 1. Android Studio에서 프로젝트 열기
 2. Gradle 동기화 대기
-3. 빌드 및 실행
+3. 앱 모듈에서 Run
 
-```bash
-./gradlew assembleDebug
-```
+로컬 환경에서 Gradle 버전/Compose 버전 등을 확인하고 필요시 버전 조정하세요.
 
 ## 라이선스
 

@@ -27,7 +27,7 @@ fun PrayerNoteNavHost(
             OnboardingScreen(
                 preferencesDataStore = preferencesDataStore,
                 onComplete = {
-                    navController.navigate(Screen.PersonList.route) {
+                    navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 }
@@ -35,13 +35,21 @@ fun PrayerNoteNavHost(
         }
 
         composable(
-            route = Screen.PersonList.route,
+            route = Screen.Home.route,
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = "prayernote://home?dayOfWeek={dayOfWeek}"
                 }
             )
         ) {
+            HomeScreen(
+                onPersonClick = { personId ->
+                    navController.navigate(Screen.PersonDetail.createRoute(personId))
+                }
+            )
+        }
+
+        composable(Screen.PersonList.route) {
             PersonListScreen(
                 onPersonClick = { personId ->
                     navController.navigate(Screen.PersonDetail.createRoute(personId))

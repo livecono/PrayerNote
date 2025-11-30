@@ -1,12 +1,16 @@
 package com.prayernote.app.presentation.screen
 
-import android.app.TimePickerDialog
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.prayernote.app.R
 import com.prayernote.app.data.local.entity.AlarmTime
+import com.prayernote.app.presentation.component.CustomTimePickerDialog
 import com.prayernote.app.presentation.viewmodel.SettingsEvent
 import com.prayernote.app.presentation.viewmodel.SettingsViewModel
 import com.prayernote.app.presentation.viewmodel.ThemeMode
@@ -36,6 +41,17 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showPermissionRequest by remember { mutableStateOf(false) }
     var hasPermission by remember { mutableStateOf(hasNotificationPermission(context)) }
+    var showAddTimePickerDialog by remember { mutableStateOf(false) }
+    var showEditTimePickerDialog by remember { mutableStateOf<AlarmTime?>(null) }
+    val canScheduleExactAlarms by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                viewModel.canScheduleExactAlarms()
+            } else {
+                true
+            }
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collectLatest { event ->
@@ -130,6 +146,54 @@ fun SettingsScreen(
                 }
             }
 
+            // Exact Alarm Permission Warning (Android 12+)
+            if (!canScheduleExactAlarms && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "정확한 알람 권한 필요",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = "정확한 시간에 알림을 받으려면 설정에서 권한을 허용해주세요",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            TextButton(onClick = {
+                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(intent)
+                            }) {
+                                Text("설정")
+                            }
+                        }
+                    }
+                }
+            }
+
             // Alarm Section
             item {
                 Text(
@@ -137,7 +201,9 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
-            }            if (alarmTimes.isEmpty()) {
+            }
+
+            if (alarmTimes.isEmpty()) {
                 item {
                     Text(
                         text = stringResource(R.string.no_alarm),
@@ -151,6 +217,7 @@ fun SettingsScreen(
                     AlarmTimeItem(
                         alarm = alarm,
                         onToggle = { viewModel.toggleAlarm(alarm) },
+                        onEdit = { showEditTimePickerDialog = alarm },
                         onDelete = { viewModel.deleteAlarm(alarm) }
                     )
                 }
@@ -158,15 +225,7 @@ fun SettingsScreen(
 
             item {
                 Button(
-                    onClick = {
-                        TimePickerDialog(
-                            context,
-                            { _, hour, minute ->
-                                viewModel.addAlarm(hour, minute)
-                            },
-                            7, 0, true
-                        ).show()
-                    },
+                    onClick = { showAddTimePickerDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
@@ -256,12 +315,33 @@ fun SettingsScreen(
             showPermissionRequest = false
         }
     }
+
+    if (showAddTimePickerDialog) {
+        CustomTimePickerDialog(
+            onDismiss = { showAddTimePickerDialog = false },
+            onConfirm = { hour, minute ->
+                viewModel.addAlarm(hour, minute)
+            }
+        )
+    }
+
+    showEditTimePickerDialog?.let { alarm ->
+        CustomTimePickerDialog(
+            initialHour = alarm.hour,
+            initialMinute = alarm.minute,
+            onDismiss = { showEditTimePickerDialog = null },
+            onConfirm = { hour, minute ->
+                viewModel.updateAlarmTime(alarm, hour, minute)
+            }
+        )
+    }
 }
 
 @Composable
 fun AlarmTimeItem(
     alarm: AlarmTime,
     onToggle: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -277,10 +357,12 @@ fun AlarmTimeItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = String.format("%02d:%02d", alarm.hour, alarm.minute),
-                style = MaterialTheme.typography.titleLarge
-            )
+            TextButton(onClick = onEdit) {
+                Text(
+                    text = String.format("%02d:%02d", alarm.hour, alarm.minute),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically

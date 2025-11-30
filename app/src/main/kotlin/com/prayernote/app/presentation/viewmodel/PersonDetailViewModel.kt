@@ -109,6 +109,18 @@ class PersonDetailViewModel @Inject constructor(
         }
     }
 
+    fun updatePrayerTopicTitle(topic: PrayerTopic, newTitle: String) {
+        viewModelScope.launch {
+            try {
+                val updatedTopic = topic.copy(title = newTitle)
+                repository.updatePrayerTopic(updatedTopic)
+                _uiEvent.emit(PersonDetailEvent.TopicUpdated)
+            } catch (e: Exception) {
+                _uiEvent.emit(PersonDetailEvent.Error(e.message ?: "수정 실패"))
+            }
+        }
+    }
+
     fun deletePrayerTopic(topic: PrayerTopic) {
         viewModelScope.launch {
             try {
@@ -132,6 +144,7 @@ sealed class PersonDetailUiState {
 
 sealed class PersonDetailEvent {
     object TopicAdded : PersonDetailEvent()
+    object TopicUpdated : PersonDetailEvent()
     object TopicAnswered : PersonDetailEvent()
     object TopicDeleted : PersonDetailEvent()
     data class Error(val message: String) : PersonDetailEvent()

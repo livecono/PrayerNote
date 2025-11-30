@@ -1,12 +1,15 @@
 package com.prayernote.app.util
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
-import androidx.work.*
+import android.content.Intent
+import android.os.Build
+import android.util.Log
 import com.prayernote.app.data.local.entity.AlarmTime
-import com.prayernote.app.worker.DailyPrayerWorker
+import com.prayernote.app.receiver.AlarmReceiver
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,12 +17,20 @@ import javax.inject.Singleton
 class AlarmScheduler @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val workManager = WorkManager.getInstance(context)
+    private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun scheduleAlarm(alarm: AlarmTime) {
         if (!alarm.enabled) {
             cancelAlarm(alarm)
             return
+        }
+
+        // Check if we can schedule exact alarms
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (!alarmManager.canScheduleExactAlarms()) {
+                // Cannot schedule exact alarms, need to request permission
+                return
+            }
         }
 
         val currentTime = Calendar.getInstance()
@@ -35,48 +46,75 @@ class AlarmScheduler @Inject constructor(
             }
         }
 
-        val initialDelay = targetTime.timeInMillis - currentTime.timeInMillis
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.prayernote.app.DAILY_ALARM"
+            putExtra("alarm_id", alarm.id)
+            putExtra("alarm_hour", alarm.hour)
+            putExtra("alarm_minute", alarm.minute)
+        }
 
-        val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(false)
-            .build()
-
-        val workRequest = PeriodicWorkRequestBuilder<DailyPrayerWorker>(
-            24, TimeUnit.HOURS,
-            15, TimeUnit.MINUTES // Flex interval
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            alarm.id.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .setConstraints(constraints)
-            .addTag(getWorkTag(alarm))
-            .build()
 
-        workManager.enqueueUniquePeriodicWork(
-            getWorkName(alarm),
-            ExistingPeriodicWorkPolicy.REPLACE,
-            workRequest
-        )
-    }
+        Log.d("AlarmScheduler", "Scheduling alarm: ID=${alarm.id}, Time=${alarm.hour}:${alarm.minute}, Target=${targetTime.time}")
 
-    fun cancelAlarm(alarm: AlarmTime) {
-        workManager.cancelUniqueWork(getWorkName(alarm))
-    }
-
-    fun cancelAllAlarms() {
-        workManager.cancelAllWorkByTag("daily_prayer")
-    }
-
-    fun rescheduleAllAlarms(alarms: List<AlarmTime>) {
-        cancelAllAlarms()
-        alarms.filter { it.enabled }.forEach { alarm ->
-            scheduleAlarm(alarm)
+        // Use setExactAndAllowWhileIdle for precise alarm even in Doze mode
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                targetTime.timeInMillis,
+                pendingIntent
+            )
+            Log.d("AlarmScheduler", "Used setExactAndAllowWhileIdle")
+        } else {
+            alarmManager.setExact(
+                AlarmManager.RTC_WAKEUP,
+                targetTime.timeInMillis,
+                pendingIntent
+            )
+            Log.d("AlarmScheduler", "Used setExact")
         }
     }
 
-    private fun getWorkName(alarm: AlarmTime): String {
-        return "daily_prayer_${alarm.id}_${alarm.hour}_${alarm.minute}"
+    fun cancelAlarm(alarm: AlarmTime) {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.prayernote.app.DAILY_ALARM"
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            alarm.id.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 
-    private fun getWorkTag(alarm: AlarmTime): String {
-        return "daily_prayer"
+    fun cancelAllAlarms() {
+        // This will be called with actual alarm list from repository
+    }
+
+    fun rescheduleAllAlarms(alarms: List<AlarmTime>) {
+        alarms.forEach { alarm ->
+            if (alarm.enabled) {
+                scheduleAlarm(alarm)
+            } else {
+                cancelAlarm(alarm)
+            }
+        }
+    }
+
+    fun canScheduleExactAlarms(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
+        }
     }
 }
