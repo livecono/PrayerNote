@@ -23,6 +23,9 @@
     
     <!-- Media permissions for gallery access (Android 13+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    
+    <!-- Contacts permission -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
         android:name=".PrayerNoteApplication"

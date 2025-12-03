@@ -1,5 +1,10 @@
 package com.prayernote.app.presentation.screen
 
+import android.Manifest
+import android.content.Intent
+import android.provider.ContactsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -248,6 +254,62 @@ fun AddPersonDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var memo by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    // READ_CONTACTS permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            android.util.Log.d("PersonListScreen", "READ_CONTACTS permission denied")
+        }
+    }
+    
+    // Request permission on first composition
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+    }
+    
+    // Contact picker launcher
+    val contactPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact()
+    ) { uri ->
+        uri?.let {
+            try {
+                val cursor = context.contentResolver.query(
+                    uri,
+                    arrayOf(
+                        ContactsContract.Contacts.DISPLAY_NAME,
+                        ContactsContract.Contacts._ID
+                    ),
+                    null,
+                    null,
+                    null
+                )
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
+                        val idIndex = it.getColumnIndex(ContactsContract.Contacts._ID)
+                        
+                        if (nameIndex >= 0) {
+                            name = it.getString(nameIndex) ?: ""
+                        }
+                        
+                        // Get contact groups
+                        if (idIndex >= 0) {
+                            val contactId = it.getString(idIndex)
+                            val groups = getContactGroups(context, contactId)
+                            if (groups.isNotEmpty()) {
+                                memo = groups.joinToString(", ")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -259,7 +321,16 @@ fun AddPersonDialog(
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.person_name)) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = { contactPickerLauncher.launch(null) }) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = "연락처에서 선택",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -421,4 +492,63 @@ fun EditPersonDialog(
             }
         }
     )
+}
+
+// Helper function to get contact groups
+private fun getContactGroups(context: android.content.Context, contactId: String): List<String> {
+    val groups = mutableSetOf<String>()  // Use Set to avoid duplicates
+    try {
+        val cursor = context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID),
+            "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?",
+            arrayOf(contactId, ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE),
+            null
+        )
+        
+        cursor?.use {
+            val groupIdIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID)
+            while (it.moveToNext()) {
+                if (groupIdIndex >= 0) {
+                    val groupId = it.getString(groupIdIndex)
+                    groupId?.let { id ->
+                        val groupName = getGroupName(context, id)
+                        // Filter out system groups like "My Contacts"
+                        if (groupName.isNotEmpty() && 
+                            groupName != "My Contacts" && 
+                            !groupName.startsWith("System Group:")) {
+                            groups.add(groupName)
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return groups.toList()
+}
+
+private fun getGroupName(context: android.content.Context, groupId: String): String {
+    try {
+        val cursor = context.contentResolver.query(
+            ContactsContract.Groups.CONTENT_URI,
+            arrayOf(ContactsContract.Groups.TITLE),
+            "${ContactsContract.Groups._ID} = ?",
+            arrayOf(groupId),
+            null
+        )
+        
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val titleIndex = it.getColumnIndex(ContactsContract.Groups.TITLE)
+                if (titleIndex >= 0) {
+                    return it.getString(titleIndex) ?: ""
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return ""
 }
