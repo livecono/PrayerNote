@@ -65,6 +65,12 @@ fun PersonListScreen(
                         duration = SnackbarDuration.Short
                     )
                 }
+                is PersonListEvent.PrayerTopicAdded -> {
+                    snackbarHostState.showSnackbar(
+                        message = "기도제목이 추가되었습니다",
+                        duration = SnackbarDuration.Short
+                    )
+                }
                 is PersonListEvent.Error -> {
                     snackbarHostState.showSnackbar(event.message)
                 }

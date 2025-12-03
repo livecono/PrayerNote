@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.prayernote.app.data.local.entity.Person
+import com.prayernote.app.data.local.entity.PrayerStatus
+import com.prayernote.app.data.local.entity.PrayerTopic
 import com.prayernote.app.domain.repository.PrayerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Date
 import javax.inject.Inject
 
 @HiltViewModel
@@ -107,6 +110,24 @@ class PersonListViewModel @Inject constructor(
         }
     }
 
+    fun addPrayerTopicToPerson(personId: Long, topic: String) {
+        viewModelScope.launch {
+            try {
+                val prayerTopic = PrayerTopic(
+                    personId = personId,
+                    title = topic,
+                    status = PrayerStatus.ACTIVE,
+                    createdAt = Date(),
+                    priority = 0  // Will be set by repository
+                )
+                repository.insertPrayerTopic(prayerTopic)
+                _uiEvent.emit(PersonListEvent.PrayerTopicAdded)
+            } catch (e: Exception) {
+                _uiEvent.emit(PersonListEvent.Error(e.message ?: "기도제목 추가 실패"))
+            }
+        }
+    }
+
     private val _uiEvent = MutableSharedFlow<PersonListEvent>()
     val uiEvent: SharedFlow<PersonListEvent> = _uiEvent.asSharedFlow()
 }
@@ -122,5 +143,6 @@ sealed class PersonListEvent {
     object PersonAdded : PersonListEvent()
     object PersonUpdated : PersonListEvent()
     object PersonDeleted : PersonListEvent()
+    object PrayerTopicAdded : PersonListEvent()
     data class Error(val message: String) : PersonListEvent()
 }
