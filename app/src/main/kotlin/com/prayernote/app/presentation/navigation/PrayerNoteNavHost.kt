@@ -96,6 +96,27 @@ fun PrayerNoteNavHost(
             )
         ) {
             PersonDetailScreen(
+                onNavigateBack = { navController.navigateUp() },
+                onNavigateToCamera = { personId ->
+                    navController.navigate(Screen.CameraOCR.createRoute(personId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.CameraOCR.route,
+            arguments = listOf(
+                navArgument("personId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val personId = backStackEntry.arguments?.getLong("personId") ?: return@composable
+            CameraOCRScreen(
+                onTextRecognized = { text ->
+                    personListViewModel.addPrayerTopicToPerson(personId, text)
+                    navController.navigateUp()
+                },
                 onNavigateBack = { navController.navigateUp() }
             )
         }

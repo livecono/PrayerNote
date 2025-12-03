@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
@@ -36,6 +37,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun PersonDetailScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToCamera: (Long) -> Unit = {},
     viewModel: PersonDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -43,6 +45,7 @@ fun PersonDetailScreen(
     val prayerTopics by viewModel.prayerTopics.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showAddOptionsDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     var isScrolling by remember { mutableStateOf(false) }
 
@@ -110,7 +113,7 @@ fun PersonDetailScreen(
         floatingActionButton = {
             if (selectedTab == 0 && !isScrolling) {
                 FloatingActionButton(
-                    onClick = { showAddDialog = true }
+                    onClick = { showAddOptionsDialog = true }
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_prayer_topic))
                 }
@@ -202,6 +205,118 @@ fun PersonDetailScreen(
             }
         )
     }
+
+    if (showAddOptionsDialog) {
+        AddPrayerTopicOptionsDialog(
+            onDismiss = { showAddOptionsDialog = false },
+            onManualAdd = {
+                showAddOptionsDialog = false
+                showAddDialog = true
+            },
+            onCameraAdd = {
+                showAddOptionsDialog = false
+                when (val state = uiState) {
+                    is PersonDetailUiState.Success -> {
+                        onNavigateToCamera(state.person.id)
+                    }
+                    else -> {}
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun AddPrayerTopicOptionsDialog(
+    onDismiss: () -> Unit,
+    onManualAdd: () -> Unit,
+    onCameraAdd: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("기도제목 추가 방법") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onManualAdd),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Column {
+                            Text(
+                                text = "직접 입력",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "키보드로 입력하기",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onCameraAdd),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CameraAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Column {
+                            Text(
+                                text = "카메라로 인식",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "사진 찍어서 텍스트 추출",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

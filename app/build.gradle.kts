@@ -100,8 +100,27 @@ dependencies {
     // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
-    // Accompanist (for system UI controller)
+    // Accompanist (for system UI controller and permissions)
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
+    // ML Kit Text Recognition (OCR)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.0")
+    
+    // Coroutines Play Services (for ML Kit await())
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // CameraX
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+    
+    // ExifInterface for image orientation
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Gson (JSON)
     implementation("com.google.code.gson:gson:2.10.1")
