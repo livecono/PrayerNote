@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,9 +32,19 @@ fun HomeScreen(
     onPersonClick: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val todayPrayers by viewModel.todayPrayers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showPersonSelectionDialog by remember { mutableStateOf(false) }
+    
+    // Random prayer quote
+    val prayerQuotes = context.resources.getStringArray(R.array.prayer_quotes)
+    val randomQuote = remember { 
+        prayerQuotes.random().split("|").let { 
+            it[0] to it.getOrNull(1).orEmpty() 
+        }
+    }
 
     val dayNames = listOf("주일", "월", "화", "수", "목", "금", "토")
     val calendar = Calendar.getInstance()
@@ -43,6 +55,9 @@ fun HomeScreen(
             when (event) {
                 is HomeEvent.TopicAnswered -> {
                     snackbarHostState.showSnackbar("응답 완료되었습니다")
+                }
+                is HomeEvent.PersonToggled -> {
+                    snackbarHostState.showSnackbar("오늘 기도 대상자가 변경되었습니다")
                 }
                 is HomeEvent.Error -> {
                     snackbarHostState.showSnackbar(event.message)
@@ -69,50 +84,87 @@ fun HomeScreen(
                 )
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showPersonSelectionDialog = true }
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "오늘 기도할 대상자 선택")
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        when (uiState) {
-            is HomeUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Prayer Quote Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    CircularProgressIndicator()
-                }
-            }
-            is HomeUiState.Empty -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Text(
+                        text = "\"${randomQuote.first}\"",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    if (randomQuote.second.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "오늘 기도할 대상자가 없습니다",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "요일별 탭에서 대상자를 할당해주세요",
+                            text = "- ${randomQuote.second}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
                         )
                     }
                 }
             }
-            is HomeUiState.Success, is HomeUiState.Error -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentPadding = PaddingValues(16.dp)
-                ) {
+            
+            // Content
+            Box(modifier = Modifier.weight(1f)) {
+                when (uiState) {
+                    is HomeUiState.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    is HomeUiState.Empty -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "오늘 기도할 대상자가 없습니다",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "요일별 탭에서 대상자를 할당해주세요",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    is HomeUiState.Success, is HomeUiState.Error -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp)
+                        ) {
                     todayPrayers.forEach { (person, topics) ->
                         item(key = "header_${person.id}") {
                             Card(
@@ -168,8 +220,95 @@ fun HomeScreen(
                     }
                 }
             }
+                }
+            }
         }
     }
+
+    if (showPersonSelectionDialog) {
+        TodayPersonSelectionDialog(
+            onDismiss = { showPersonSelectionDialog = false },
+            todayPersonIds = todayPrayers.keys.map { it.id }.toSet(),
+            onConfirm = { selectedPersonIds ->
+                viewModel.updateTodayPersons(selectedPersonIds)
+                showPersonSelectionDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun TodayPersonSelectionDialog(
+    onDismiss: () -> Unit,
+    todayPersonIds: Set<Long>,
+    onConfirm: (Set<Long>) -> Unit,
+    personListViewModel: com.prayernote.app.presentation.viewmodel.PersonListViewModel = hiltViewModel()
+) {
+    val persons by personListViewModel.persons.collectAsState()
+    var selectedPersonIds by remember { mutableStateOf(todayPersonIds) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("오늘 기도할 대상자 선택") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+            ) {
+                items(persons, key = { it.id }) { person ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { 
+                                selectedPersonIds = if (selectedPersonIds.contains(person.id)) {
+                                    selectedPersonIds - person.id
+                                } else {
+                                    selectedPersonIds + person.id
+                                }
+                            }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selectedPersonIds.contains(person.id),
+                            onCheckedChange = { checked ->
+                                selectedPersonIds = if (checked) {
+                                    selectedPersonIds + person.id
+                                } else {
+                                    selectedPersonIds - person.id
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = person.name,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            if (person.memo.isNotEmpty()) {
+                                Text(
+                                    text = person.memo,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedPersonIds) }) {
+                Text("완료")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소")
+            }
+        }
+    )
 }
 
 @Composable

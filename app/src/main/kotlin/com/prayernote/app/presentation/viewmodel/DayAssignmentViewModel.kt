@@ -7,6 +7,7 @@ import com.prayernote.app.domain.repository.PrayerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 @HiltViewModel
@@ -14,7 +15,7 @@ class DayAssignmentViewModel @Inject constructor(
     private val repository: PrayerRepository
 ) : ViewModel() {
 
-    private val _selectedDay = MutableStateFlow(0)
+    private val _selectedDay = MutableStateFlow(getCurrentDayOfWeek())
     val selectedDay: StateFlow<Int> = _selectedDay.asStateFlow()
 
     private val _assignedPersons = MutableStateFlow<List<Person>>(emptyList())
@@ -95,6 +96,11 @@ class DayAssignmentViewModel @Inject constructor(
 
     private val _uiEvent = MutableSharedFlow<DayAssignmentEvent>()
     val uiEvent: SharedFlow<DayAssignmentEvent> = _uiEvent.asSharedFlow()
+
+    private fun getCurrentDayOfWeek(): Int {
+        val calendar = Calendar.getInstance()
+        return calendar.get(Calendar.DAY_OF_WEEK) - 1 // 0-6: 일-토
+    }
 }
 
 sealed class DayAssignmentEvent {

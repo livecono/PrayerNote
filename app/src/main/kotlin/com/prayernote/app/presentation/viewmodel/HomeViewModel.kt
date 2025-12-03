@@ -93,6 +93,59 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+
+    fun togglePersonForToday(personId: Long) {
+        viewModelScope.launch {
+            try {
+                val calendar = Calendar.getInstance()
+                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
+                val person = repository.getPersonById(personId).first() ?: return@launch
+                
+                val updatedDays = person.dayOfWeekAssignment.toMutableSet()
+                if (updatedDays.contains(dayOfWeek)) {
+                    updatedDays.remove(dayOfWeek)
+                } else {
+                    updatedDays.add(dayOfWeek)
+                }
+                
+                repository.updatePerson(person.copy(dayOfWeekAssignment = updatedDays))
+                _uiEvent.emit(HomeEvent.PersonToggled)
+            } catch (e: Exception) {
+                _uiEvent.emit(HomeEvent.Error(e.message ?: "대상자 설정 실패"))
+            }
+        }
+    }
+
+    fun updateTodayPersons(selectedPersonIds: Set<Long>) {
+        viewModelScope.launch {
+            try {
+                val calendar = Calendar.getInstance()
+                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
+                
+                // Get all persons
+                val allPersons = repository.getAllPersons().first()
+                
+                // Update each person's day assignment
+                allPersons.forEach { person ->
+                    val updatedDays = person.dayOfWeekAssignment.toMutableSet()
+                    val shouldBeAssigned = selectedPersonIds.contains(person.id)
+                    val isCurrentlyAssigned = updatedDays.contains(dayOfWeek)
+                    
+                    if (shouldBeAssigned && !isCurrentlyAssigned) {
+                        updatedDays.add(dayOfWeek)
+                        repository.updatePerson(person.copy(dayOfWeekAssignment = updatedDays))
+                    } else if (!shouldBeAssigned && isCurrentlyAssigned) {
+                        updatedDays.remove(dayOfWeek)
+                        repository.updatePerson(person.copy(dayOfWeekAssignment = updatedDays))
+                    }
+                }
+                
+                _uiEvent.emit(HomeEvent.PersonToggled)
+            } catch (e: Exception) {
+                _uiEvent.emit(HomeEvent.Error(e.message ?: "대상자 설정 실패"))
+            }
+        }
+    }
 }
 
 sealed class HomeUiState {
@@ -104,5 +157,6 @@ sealed class HomeUiState {
 
 sealed class HomeEvent {
     object TopicAnswered : HomeEvent()
+    object PersonToggled : HomeEvent()
     data class Error(val message: String) : HomeEvent()
 }
