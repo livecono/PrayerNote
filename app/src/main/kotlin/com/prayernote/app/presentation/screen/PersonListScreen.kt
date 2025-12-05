@@ -181,6 +181,9 @@ fun PersonListScreen(
             onDismiss = { showEditDialog = null },
             onConfirm = { name, memo, dayOfWeekAssignment ->
                 viewModel.updatePerson(person, name, memo, dayOfWeekAssignment)
+            },
+            onDelete = {
+                viewModel.deletePerson(person)
             }
         )
     }
@@ -233,13 +236,6 @@ fun PersonListItem(
                         imageVector = Icons.Filled.Edit,
                         contentDescription = stringResource(R.string.edit),
                         tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.delete),
-                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             }
@@ -367,7 +363,8 @@ fun AddPersonDialog(
 fun EditPersonDialog(
     person: Person,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, Set<Int>) -> Unit
+    onConfirm: (String, String, Set<Int>) -> Unit,
+    onDelete: () -> Unit
 ) {
     var name by remember { mutableStateOf(person.name) }
     var memo by remember { mutableStateOf(person.memo) }
@@ -474,7 +471,7 @@ fun EditPersonDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     if (name.isNotBlank()) {
                         onConfirm(name.trim(), memo.trim(), selectedDays)
@@ -487,8 +484,35 @@ fun EditPersonDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        onDelete()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.delete))
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         }
     )
