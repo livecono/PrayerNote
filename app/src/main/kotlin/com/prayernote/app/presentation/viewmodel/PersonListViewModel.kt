@@ -34,6 +34,9 @@ class PersonListViewModel @Inject constructor(
                 repository.searchPersons(query)
             }
         }
+        .map { persons ->
+            persons.sortedBy { it.priority }
+        }
         .catch { exception ->
             _uiState.value = PersonListUiState.Error(exception.message ?: "알 수 없는 오류")
         }
@@ -106,6 +109,21 @@ class PersonListViewModel @Inject constructor(
                 _uiEvent.emit(PersonListEvent.PersonDeleted)
             } catch (e: Exception) {
                 _uiEvent.emit(PersonListEvent.Error(e.message ?: "삭제 실패"))
+            }
+        }
+    }
+
+    fun reorderPersons(persons: List<Person>) {
+        viewModelScope.launch {
+            try {
+                val updatedPersons = persons.mapIndexed { index, person ->
+                    person.copy(priority = index)
+                }
+                updatedPersons.forEach { person ->
+                    repository.updatePerson(person)
+                }
+            } catch (e: Exception) {
+                _uiEvent.emit(PersonListEvent.Error(e.message ?: "순서 변경 실패"))
             }
         }
     }

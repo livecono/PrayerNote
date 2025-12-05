@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,8 @@ import com.prayernote.app.presentation.viewmodel.PersonListEvent
 import com.prayernote.app.presentation.viewmodel.PersonListUiState
 import com.prayernote.app.presentation.viewmodel.PersonListViewModel
 import kotlinx.coroutines.flow.collectLatest
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,20 +150,14 @@ fun PersonListScreen(
                     }
                 }
                 is PersonListUiState.Success, is PersonListUiState.Error -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        items(persons, key = { it.id }) { person ->
-                            PersonListItem(
-                                person = person,
-                                onClick = { onPersonClick(person.id) },
-                                onEdit = { showEditDialog = person },
-                                onDelete = { viewModel.deletePerson(person) }
-                            )
-                        }
-                    }
+                    ReorderablePersonList(
+                        persons = persons,
+                        onReorder = { viewModel.reorderPersons(it) },
+                        onPersonClick = onPersonClick,
+                        onEdit = { showEditDialog = it },
+                        onDelete = { viewModel.deletePerson(it) },
+                        listState = listState
+                    )
                 }
             }
         }
@@ -189,15 +186,63 @@ fun PersonListScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ReorderablePersonList(
+    persons: List<Person>,
+    onReorder: (List<Person>) -> Unit,
+    onPersonClick: (Long) -> Unit,
+    onEdit: (Person) -> Unit,
+    onDelete: (Person) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState
+) {
+    var items by remember(persons) { mutableStateOf(persons) }
+    val reorderableLazyListState = rememberReorderableLazyListState(listState) { from, to ->
+        items = items.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+    }
+
+    LaunchedEffect(items) {
+        if (items != persons) {
+            onReorder(items)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        items(items, key = { it.id }) { person ->
+            ReorderableItem(
+                state = reorderableLazyListState,
+                key = person.id
+            ) { isDragging ->
+                PersonListItem(
+                    person = person,
+                    isDragging = isDragging,
+                    onClick = { onPersonClick(person.id) },
+                    onEdit = { onEdit(person) },
+                    onDelete = { onDelete(person) },
+                    modifier = Modifier.longPressDraggableHandle()
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun PersonListItem(
     person: Person,
     onClick: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isDragging: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick),

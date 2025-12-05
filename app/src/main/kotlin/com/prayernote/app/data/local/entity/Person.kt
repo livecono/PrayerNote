@@ -11,5 +11,6 @@ data class Person(
     val name: String,
     val memo: String = "",
     val dayOfWeekAssignment: Set<Int> = emptySet(), // 0-6: 일-토, 7: 매일
+    val priority: Int = 0, // For ordering
     val createdAt: Date = Date()
 )
