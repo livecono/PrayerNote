@@ -3,6 +3,7 @@ plugins {
     kotlin("android")
     kotlin("kapt")
     id("dagger.hilt.android.plugin")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -130,6 +131,11 @@ dependencies {
 
     // Apache Commons Compress (ZIP)
     implementation("org.apache.commons:commons-compress:1.24.0")
+
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.7.1"))
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-auth")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

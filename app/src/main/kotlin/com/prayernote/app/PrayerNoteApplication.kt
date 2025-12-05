@@ -3,6 +3,7 @@ package com.prayernote.app
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.google.firebase.FirebaseApp
 import com.prayernote.app.data.local.entity.AlarmTime
 import com.prayernote.app.domain.repository.PrayerRepository
 import com.prayernote.app.util.AlarmScheduler
@@ -30,6 +31,13 @@ class PrayerNoteApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Initialize Firebase
+        try {
+            FirebaseApp.initializeApp(this)
+            android.util.Log.d("PrayerNoteApplication", "Firebase initialized successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerNoteApplication", "Firebase initialization failed: ${e.message}", e)
+        }
         initializeApp()
     }
 

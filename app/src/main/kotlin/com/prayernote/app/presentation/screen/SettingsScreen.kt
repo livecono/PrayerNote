@@ -43,6 +43,7 @@ fun SettingsScreen(
     var hasPermission by remember { mutableStateOf(hasNotificationPermission(context)) }
     var showAddTimePickerDialog by remember { mutableStateOf(false) }
     var showEditTimePickerDialog by remember { mutableStateOf<AlarmTime?>(null) }
+    var showFirebaseBackupDialog by remember { mutableStateOf(false) }
     val canScheduleExactAlarms by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -52,6 +53,15 @@ fun SettingsScreen(
             }
         )
     }
+
+    // Firebase Backup State
+    val selectedPersons by viewModel.selectedPersons.collectAsState()
+    val selectedTopics by viewModel.selectedTopics.collectAsState()
+    val allPersons by viewModel.allPersons.collectAsState()
+    val allTopics by viewModel.allTopics.collectAsState()
+    val backupInProgress by viewModel.backupInProgress.collectAsState()
+    val restoreInProgress by viewModel.restoreInProgress.collectAsState()
+    val backupSessions by viewModel.backupSessions.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collectLatest { event ->
@@ -71,11 +81,15 @@ fun SettingsScreen(
                 is SettingsEvent.BackupRequested -> {
                     snackbarHostState.showSnackbar("백업 기능은 구현 예정입니다")
                 }
-                is SettingsEvent.CsvExportRequested -> {
-                    snackbarHostState.showSnackbar("CSV 내보내기 기능은 구현 예정입니다")
-                }
                 is SettingsEvent.RestoreRequested -> {
                     snackbarHostState.showSnackbar("복원 기능은 구현 예정입니다")
+                }
+                is SettingsEvent.FirebaseBackupSuccess -> {
+                    snackbarHostState.showSnackbar("백업이 완료되었습니다 (ID: ${event.backupId})")
+                    showFirebaseBackupDialog = false
+                }
+                is SettingsEvent.FirebaseRestoreSuccess -> {
+                    snackbarHostState.showSnackbar(event.message)
                 }
                 is SettingsEvent.Error -> {
                     snackbarHostState.showSnackbar(event.message)
@@ -283,28 +297,25 @@ fun SettingsScreen(
             }
 
             item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Button(
+                    onClick = { showFirebaseBackupDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
                 ) {
-                    OutlinedButton(
-                        onClick = { viewModel.backupToJson() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.backup_json))
-                    }
-                    OutlinedButton(
-                        onClick = { viewModel.backupToCsv() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.backup_csv))
-                    }
-                    Button(
-                        onClick = { viewModel.restoreFromJson() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.restore_json))
-                    }
+                    Text("백업")
                 }
+            }
+
+            item {
+                BackupSessionListSection(
+                    sessions = backupSessions,
+                    restoreInProgress = restoreInProgress,
+                    onRestoreClick = { backupId ->
+                        viewModel.restoreFromBackup(backupId)
+                    }
+                )
             }
         }
     }
@@ -332,6 +343,32 @@ fun SettingsScreen(
             onDismiss = { showEditTimePickerDialog = null },
             onConfirm = { hour, minute ->
                 viewModel.updateAlarmTime(alarm, hour, minute)
+            }
+        )
+    }
+
+    if (showFirebaseBackupDialog) {
+        FirebaseBackupDialog(
+            allPersons = allPersons,
+            allTopics = allTopics,
+            selectedPersons = selectedPersons,
+            selectedTopics = selectedTopics,
+            backupInProgress = backupInProgress,
+            onPersonToggle = { viewModel.togglePersonSelection(it) },
+            onTopicToggle = { viewModel.toggleTopicSelection(it) },
+            onSelectAllPersons = { viewModel.selectAllPersons() },
+            onClearPersons = { viewModel.clearPersonSelection() },
+            onSelectAllTopics = { viewModel.selectAllTopics() },
+            onClearTopics = { viewModel.clearTopicSelection() },
+            onBackupClick = { 
+                viewModel.backupToFirebase()
+                // 백업 시작 시 다이얼로그 즉시 닫기
+                showFirebaseBackupDialog = false
+            },
+            onDismiss = { 
+                showFirebaseBackupDialog = false
+                viewModel.clearPersonSelection()
+                viewModel.clearTopicSelection()
             }
         )
     }

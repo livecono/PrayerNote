@@ -1,8 +1,12 @@
 package com.prayernote.app.presentation.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.prayernote.app.data.local.entity.AlarmTime
+import com.prayernote.app.data.local.entity.Person
+import com.prayernote.app.data.local.entity.PrayerTopic
+import com.prayernote.app.domain.repository.BackupRepository
 import com.prayernote.app.domain.repository.PrayerRepository
 import com.prayernote.app.util.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,7 +17,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: PrayerRepository,
-    private val alarmScheduler: AlarmScheduler
+    private val alarmScheduler: AlarmScheduler,
+    private val backupRepository: BackupRepository?
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
@@ -35,8 +40,62 @@ class SettingsViewModel @Inject constructor(
     private val _selectedTheme = MutableStateFlow(ThemeMode.SYSTEM)
     val selectedTheme: StateFlow<ThemeMode> = _selectedTheme.asStateFlow()
 
+    // Firebase 백업 관련 상태
+    private val _backupInProgress = MutableStateFlow(false)
+    val backupInProgress: StateFlow<Boolean> = _backupInProgress.asStateFlow()
+
+    private val _restoreInProgress = MutableStateFlow(false)
+    val restoreInProgress: StateFlow<Boolean> = _restoreInProgress.asStateFlow()
+
+    private val _backupSessions = MutableStateFlow<List<com.prayernote.app.data.firebase.model.BackupSession>>(emptyList())
+    val backupSessions: StateFlow<List<com.prayernote.app.data.firebase.model.BackupSession>> = _backupSessions.asStateFlow()
+
+    private val _selectedPersons = MutableStateFlow<List<Person>>(emptyList())
+    val selectedPersons: StateFlow<List<Person>> = _selectedPersons.asStateFlow()
+
+    private val _selectedTopics = MutableStateFlow<List<PrayerTopic>>(emptyList())
+    val selectedTopics: StateFlow<List<PrayerTopic>> = _selectedTopics.asStateFlow()
+
+    val allPersons: StateFlow<List<Person>> = repository.getAllPersons()
+        .catch { exception ->
+            Log.e("SettingsViewModel", "Failed to load persons", exception)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // 선택된 대상자와 함께 기도제목을 필터링
+    val filteredTopics: StateFlow<List<PrayerTopic>> = selectedPersons
+        .flatMapLatest { persons ->
+            if (persons.isEmpty()) {
+                flowOf(emptyList())
+            } else {
+                // 선택된 모든 대상자의 기도제목을 로드
+                combine(
+                    *persons.map { person ->
+                        repository.getPrayerTopicsByPerson(person.id)
+                    }.toTypedArray()
+                ) { arrays ->
+                    arrays.filterIsInstance<List<PrayerTopic>>().flatten()
+                }
+            }
+        }
+        .catch { exception ->
+            Log.e("SettingsViewModel", "Failed to load topics", exception)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val allTopics: StateFlow<List<PrayerTopic>> = filteredTopics
+
     init {
         loadSettings()
+        loadBackupSessions()
     }
 
     private fun loadSettings() {
@@ -47,6 +106,26 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = SettingsUiState.Error(e.message ?: "알 수 없는 오류")
             }
         }
+    }
+
+    private fun loadBackupSessions() {
+        viewModelScope.launch {
+            try {
+                val result = backupRepository?.getBackupSessions()
+                result?.onSuccess { sessions ->
+                    _backupSessions.value = sessions
+                    Log.d("SettingsViewModel", "Loaded ${sessions.size} backup sessions")
+                }?.onFailure { exception ->
+                    Log.e("SettingsViewModel", "Failed to load backup sessions", exception)
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Exception loading backup sessions", e)
+            }
+        }
+    }
+
+    fun reloadBackupSessions() {
+        loadBackupSessions()
     }
 
     fun showAlarmDialog() {
@@ -170,6 +249,112 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // Firebase 백업 관련 메서드
+    fun togglePersonSelection(person: Person) {
+        val current = _selectedPersons.value.toMutableList()
+        if (current.contains(person)) {
+            current.remove(person)
+        } else {
+            current.add(person)
+        }
+        _selectedPersons.value = current
+    }
+
+    fun toggleTopicSelection(topic: PrayerTopic) {
+        val current = _selectedTopics.value.toMutableList()
+        if (current.contains(topic)) {
+            current.remove(topic)
+        } else {
+            current.add(topic)
+        }
+        _selectedTopics.value = current
+    }
+
+    fun clearPersonSelection() {
+        _selectedPersons.value = emptyList()
+    }
+
+    fun clearTopicSelection() {
+        _selectedTopics.value = emptyList()
+    }
+
+    fun selectAllPersons() {
+        _selectedPersons.value = allPersons.value
+    }
+
+    fun selectAllTopics() {
+        _selectedTopics.value = allTopics.value
+    }
+
+    fun backupToFirebase() {
+        if (_selectedPersons.value.isEmpty()) {
+            viewModelScope.launch {
+                _uiEvent.emit(SettingsEvent.Error("백업할 대상자를 선택해주세요"))
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _backupInProgress.value = true
+                
+                val result = backupRepository?.backupSelectedData(
+                    persons = _selectedPersons.value,
+                    topics = _selectedTopics.value,
+                    includeAnswered = true
+                )
+
+                result?.onSuccess { backupId ->
+                    Log.d("SettingsViewModel", "Backup successful: $backupId")
+                    _selectedPersons.value = emptyList()
+                    _selectedTopics.value = emptyList()
+                    loadBackupSessions() // 백업 후 세션 목록 새로고침
+                    viewModelScope.launch {
+                        _uiEvent.emit(SettingsEvent.FirebaseBackupSuccess(backupId))
+                    }
+                }?.onFailure { exception ->
+                    Log.e("SettingsViewModel", "Backup failed", exception)
+                    viewModelScope.launch {
+                        _uiEvent.emit(SettingsEvent.Error(exception.message ?: "Firebase 백업 실패"))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Exception during backup", e)
+                _uiEvent.emit(SettingsEvent.Error(e.message ?: "Firebase 백업 중 오류 발생"))
+            } finally {
+                _backupInProgress.value = false
+            }
+        }
+    }
+
+    fun restoreFromBackup(backupId: String) {
+        viewModelScope.launch {
+            try {
+                _restoreInProgress.value = true
+                
+                val result = backupRepository?.restoreBackupData(backupId)
+
+                result?.onSuccess { message ->
+                    Log.d("SettingsViewModel", "Restore successful: $message")
+                    loadBackupSessions() // 복원 후 세션 목록 새로고침
+                    viewModelScope.launch {
+                        _uiEvent.emit(SettingsEvent.FirebaseRestoreSuccess(message))
+                    }
+                }?.onFailure { exception ->
+                    Log.e("SettingsViewModel", "Restore failed", exception)
+                    viewModelScope.launch {
+                        _uiEvent.emit(SettingsEvent.Error(exception.message ?: "Firebase 복원 실패"))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Exception during restore", e)
+                _uiEvent.emit(SettingsEvent.Error(e.message ?: "Firebase 복원 중 오류 발생"))
+            } finally {
+                _restoreInProgress.value = false
+            }
+        }
+    }
+
     private val _uiEvent = MutableSharedFlow<SettingsEvent>()
     val uiEvent: SharedFlow<SettingsEvent> = _uiEvent.asSharedFlow()
 }
@@ -195,5 +380,7 @@ sealed class SettingsEvent {
     object BackupRequested : SettingsEvent()
     object CsvExportRequested : SettingsEvent()
     object RestoreRequested : SettingsEvent()
+    data class FirebaseBackupSuccess(val backupId: String) : SettingsEvent()
+    data class FirebaseRestoreSuccess(val message: String) : SettingsEvent()
     data class Error(val message: String) : SettingsEvent()
 }
