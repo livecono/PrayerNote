@@ -3,6 +3,7 @@ package com.prayernote.app.presentation.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.prayernote.app.data.datastore.PreferencesDataStore
 import com.prayernote.app.data.local.entity.AlarmTime
 import com.prayernote.app.data.local.entity.Person
 import com.prayernote.app.data.local.entity.PrayerTopic
@@ -18,7 +19,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val repository: PrayerRepository,
     private val alarmScheduler: AlarmScheduler,
-    private val backupRepository: BackupRepository?
+    private val backupRepository: BackupRepository?,
+    private val preferencesDataStore: PreferencesDataStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
@@ -99,6 +101,16 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadSettings() {
+        viewModelScope.launch {
+            try {
+                // Load theme from DataStore
+                preferencesDataStore.themeMode.collect { theme ->
+                    _selectedTheme.value = theme
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Error loading theme", e)
+            }
+        }
         viewModelScope.launch {
             try {
                 _uiState.value = SettingsUiState.Success
@@ -208,6 +220,7 @@ class SettingsViewModel @Inject constructor(
         _selectedTheme.value = theme
         viewModelScope.launch {
             // Save to DataStore
+            preferencesDataStore.setThemeMode(theme)
             _uiEvent.emit(SettingsEvent.ThemeChanged)
         }
     }
