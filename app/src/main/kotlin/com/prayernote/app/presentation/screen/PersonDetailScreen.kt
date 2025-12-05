@@ -420,7 +420,6 @@ fun PrayerTopicItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { showEditDialog = true }
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -434,7 +433,9 @@ fun PrayerTopicItem(
             }
 
             Column(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showEditDialog = true }
             ) {
                 Text(
                     text = topic.title,

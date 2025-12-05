@@ -24,6 +24,13 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Person 테이블에 priority 컬럼 추가
+            db.execSQL("ALTER TABLE persons ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     @Provides
     @Singleton
     fun providePrayerDatabase(
@@ -34,7 +41,7 @@ object DatabaseModule {
             PrayerDatabase::class.java,
             PrayerDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
     }
