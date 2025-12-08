@@ -31,6 +31,13 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // 기존 dayOfWeekAssignment가 빈 문자열인 경우를 모두 "7"(매일)로 설정
+            db.execSQL("UPDATE persons SET dayOfWeekAssignment = '7' WHERE dayOfWeekAssignment = ''")
+        }
+    }
+
     @Provides
     @Singleton
     fun providePrayerDatabase(
@@ -41,7 +48,7 @@ object DatabaseModule {
             PrayerDatabase::class.java,
             PrayerDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .fallbackToDestructiveMigration()
             .build()
     }
