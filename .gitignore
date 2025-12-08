@@ -97,3 +97,4 @@ lint-results*.html
 
 # Android Profiling
 *.hprof
+.github/copilot-instructions.md

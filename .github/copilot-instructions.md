@@ -1,6 +1,7 @@
 - 한국어로 대답해. Gradle 빌드는 터미널에 항상 상황이 보이도록 출력해.
 - 윈도우 powershell 환경에 맞춰서 명령을 작성해.
 - commit과 push는 내가 결정해. 자동으로 하지마.
+- commit 메시지는 한글로 작성해.
 
 - [x] Verify that the copilot-instructions.md file in the .github directory is created.
 
